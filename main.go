@@ -18,6 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bip39 "github.com/cosmos/go-bip39"
+	"github.com/pkg/errors"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 )
 
@@ -70,7 +71,10 @@ func main() {
 	}
 	log.Println("Client context created")
 
-	deploy(ctx)
+	err = deploy(ctx)
+	if err != nil {
+		panic(err)
+	}
 	log.Println("Contract deployed")
 }
 
@@ -148,12 +152,12 @@ func newMnemonic() (m string, err error) {
 func deploy(ctx client.Context) (err error) {
 	msg, err := genStoreMsg(ContractFilePath, ctx.FromAddress)
 	if err != nil {
-		return
+		return errors.WithMessage(err, "generating store message")
 	}
 
 	tf, err := createTransactionFactory(ctx)
 	if err != nil {
-		return
+		return errors.WithMessage(err, "creating transaction factory")
 	}
 
 	return tx.BroadcastTx(ctx, tf, &msg)
@@ -205,7 +209,7 @@ func createClientContext(kr keyring.Keyring, acc keyring.Info) (ctx client.Conte
 		HomeDir:           app.DefaultNodeHome,
 		KeyringDir:        "",
 		From:              acc.GetName(),
-		BroadcastMode:     "b",
+		BroadcastMode:     "sync",
 		FromName:          acc.GetName(),
 		SignModeStr:       "",
 		UseLedger:         false,
