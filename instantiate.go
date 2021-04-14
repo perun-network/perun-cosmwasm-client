@@ -9,7 +9,7 @@ import (
 )
 
 func instantiateContract(ctx client.Context, codeID CodeID) ContractAddress {
-	msg, err := genInstantiateMsg(ctx.FromAddress, codeID)
+	msg, err := genInstantiateMsg(ctx.GetFromAddress(), codeID)
 	if err != nil {
 		panic(err)
 	}

@@ -38,12 +38,8 @@ func main() {
 	}
 	log.Println("Keyring created")
 
-	operator := createClient(OperatorName, kr)
-	log.Println("Operator created")
-	client1 := createClient(Client1Name, kr)
-	log.Println("Client1 created")
-	client2 := createClient(Client2Name, kr)
-	log.Println("Client2 created")
+	operator := createCosmosClient(OperatorName, kr)
+	log.Printf("Operator created with address=%s\n", operator.ctx.FromAddress)
 
 	startNode(operator.acc)
 	log.Println("Node started")
@@ -54,7 +50,27 @@ func main() {
 	contractAddress := instantiateContract(operator.ctx, codeID)
 	log.Printf("Contract instatiated with address=%s\n", contractAddress)
 
-	// err = deposit(client1, "20ucosm")
-	_ = contractAddress
-	_, _ = client1, client2
+	client1 := createChannelClient(Client1Name, kr, contractAddress)
+	log.Printf("Client1 created with address=%s\n", client1.cosmosClient.ctx.FromAddress)
+	client2 := createChannelClient(Client2Name, kr, contractAddress)
+	log.Printf("Client2 created with address=%s\n", client2.cosmosClient.ctx.FromAddress)
+
+	amount := sdk.NewInt64Coin(DENOMINATION, 100000)
+	receiver := client1.cosmosClient.acc.GetAddress()
+	operator.transfer(receiver, amount)
+	log.Printf("Transfered %v from %s to %s\n", amount, operator.ctx.GetFromAddress(), receiver)
+
+	amount = sdk.NewInt64Coin(DENOMINATION, 100000)
+	receiver = client2.cosmosClient.acc.GetAddress()
+	operator.transfer(receiver, amount)
+	log.Printf("Transfered %v from %s to %s\n", amount, operator.ctx.GetFromAddress(), receiver)
+
+	ch := createChannel(client1, client2)
+	log.Printf("Channel created with id=%x\n", ch.ID())
+
+	client1.deposit(ch, sdk.NewInt(10))
+	log.Printf("Channel funds deposited by %s\n", client1.cosmosClient.ctx.GetFromName())
+
+	client2.deposit(ch, sdk.NewInt(10))
+	log.Printf("Channel funds deposited by %s\n", client2.cosmosClient.ctx.GetFromName())
 }

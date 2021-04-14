@@ -7,17 +7,19 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 )
 
-type Client struct {
+type CosmosClient struct {
 	acc keyring.Info
 	ctx client.Context
 }
 
-func createClient(name string, kr keyring.Keyring) Client {
+func createCosmosClient(name string, kr keyring.Keyring) *CosmosClient {
 	acc, err := kr.Key(name)
 	if err != nil {
 		acc, err = newAccount(kr, name)
@@ -29,7 +31,20 @@ func createClient(name string, kr keyring.Keyring) Client {
 	if err != nil {
 		panic(err)
 	}
-	return Client{acc, ctx}
+	return &CosmosClient{acc, ctx}
+}
+
+func (c *CosmosClient) transfer(addr sdk.AccAddress, coin sdk.Coin) {
+	msg := types.NewMsgSend(c.ctx.GetFromAddress(), addr, sdk.NewCoins(coin))
+	err := msg.ValidateBasic()
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = transact(c.ctx, msg)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func newAccount(kr keyring.Keyring, uid string) (info keyring.Info, err error) {
@@ -58,7 +73,7 @@ func newMnemonic() (m string, err error) {
 }
 
 func createClientContext(kr keyring.Keyring, acc keyring.Info) (ctx client.Context, err error) {
-	httpClient, err := rpchttp.New(NODE_URL, "/websocket")
+	tendermintClient, err := rpchttp.New(NODE_URL, "/websocket")
 	if err != nil {
 		return
 	}
@@ -67,7 +82,7 @@ func createClientContext(kr keyring.Keyring, acc keyring.Info) (ctx client.Conte
 
 	return client.Context{
 		FromAddress:       acc.GetAddress(),
-		Client:            httpClient,
+		Client:            tendermintClient,
 		ChainID:           CHAIN_ID,
 		JSONMarshaler:     encodingConfig.Marshaler,
 		InterfaceRegistry: encodingConfig.InterfaceRegistry,

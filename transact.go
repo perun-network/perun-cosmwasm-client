@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -51,9 +50,11 @@ func createTransactionFactory(ctx client.Context) (tf tx.Factory, err error) {
 }
 
 func (r *TxResponse) EventAttributeValue(key string) (string, bool) {
-	fmt.Println(string(r.raw))
 	var response map[string]interface{}
-	json.Unmarshal(r.raw, &response)
+	err := json.Unmarshal(r.raw, &response)
+	if err != nil {
+		panic(err)
+	}
 	logs := response["logs"].([]interface{})[0].(map[string]interface{})
 	events := logs["events"].([]interface{})[0].(map[string]interface{})
 	attributes := events["attributes"].([]interface{})
