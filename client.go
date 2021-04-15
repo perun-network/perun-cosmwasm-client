@@ -1,16 +1,19 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"os"
 
 	"github.com/CosmWasm/wasmd/app"
 	"github.com/cosmos/cosmos-sdk/client"
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
+	"github.com/ethereum/go-ethereum/crypto"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 )
 
@@ -106,4 +109,46 @@ func createClientContext(kr keyring.Keyring, acc keyring.Info) (ctx client.Conte
 		AccountRetriever:  authtypes.AccountRetriever{},
 		NodeURI:           NODE_URL,
 	}, nil
+}
+
+type Signature struct {
+	R [32]byte `json:"r"`
+	S [32]byte `json:"s"`
+	V byte     `json:"v"`
+}
+
+func (c *ChannelClient) privateKey() *ecdsa.PrivateKey {
+	pwd := ""
+	a, err := c.cosmosClient.ctx.Keyring.ExportPrivKeyArmorByAddress(c.cosmosClient.acc.GetAddress(), pwd)
+	if err != nil {
+		panic(err)
+	}
+
+	k, _, err := tcrypto.UnarmorDecryptPrivKey(a, pwd)
+	if err != nil {
+		panic(err)
+	}
+
+	privKey, err := crypto.ToECDSA(k.Bytes())
+	if err != nil {
+		panic(err)
+	}
+
+	return privKey
+}
+
+func (c *ChannelClient) sign(ch *Channel) Signature {
+	k := c.privateKey()
+	h := ch.hash()
+	sig, err := crypto.Sign(h, k)
+	if err != nil {
+		panic(err)
+	}
+
+	_sig := Signature{}
+	copy(_sig.R[:], sig[:32])
+	copy(_sig.S[:], sig[32:])
+	_sig.V = sig[64]
+
+	return _sig
 }

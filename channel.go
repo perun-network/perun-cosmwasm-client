@@ -2,10 +2,10 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type (
@@ -16,18 +16,18 @@ type (
 	ChannelChallengeDuration = uint64
 
 	ChannelParameters struct {
-		members           [2]ChannelMemberAddress
-		nonce             ChannelNonce
-		challengeDuration ChannelChallengeDuration
+		Members           [2]ChannelMemberAddress  `json:"participants"`
+		Nonce             ChannelNonce             `json:"nonce"`
+		ChallengeDuration ChannelChallengeDuration `json:"challenge_duration"`
 	}
 
 	ChannelVersion = uint64
 	ChannelBalance = sdk.Uint
 
 	ChannelState struct {
-		version   ChannelVersion
-		balance   [2]ChannelBalance
-		finalized bool
+		Version   ChannelVersion    `json:"version"`
+		Balance   [2]ChannelBalance `json:"balance"`
+		Finalized bool              `json:"finalized"`
 	}
 
 	Channel struct {
@@ -50,7 +50,13 @@ func createChannelClient(name string, kr keyring.Keyring, contractAddress Contra
 }
 
 func (c *ChannelClient) ChannelMemberAddress() (addr ChannelMemberAddress) {
-	h := sha256.Sum256(c.cosmosClient.acc.GetPubKey().Bytes())
+	pub := c.cosmosClient.acc.GetPubKey().Bytes()
+	pubDecompressed, err := crypto.DecompressPubkey(pub)
+	if err != nil {
+		panic(err)
+	}
+
+	h := sha256.Sum256(crypto.FromECDSAPub(pubDecompressed))
 	copy(addr[:], h[:])
 	return
 }
@@ -58,28 +64,57 @@ func (c *ChannelClient) ChannelMemberAddress() (addr ChannelMemberAddress) {
 func createChannel(c1, c2 *ChannelClient) *Channel {
 	return &Channel{
 		params: ChannelParameters{
-			members:           [2][20]byte{c1.ChannelMemberAddress(), c2.ChannelMemberAddress()},
-			nonce:             ChannelNonce{},
-			challengeDuration: 60,
+			Members:           [2][20]byte{c1.ChannelMemberAddress(), c2.ChannelMemberAddress()},
+			Nonce:             ChannelNonce{},
+			ChallengeDuration: 60,
 		},
-		state: ChannelState{},
+		state: ChannelState{
+			Version:   0,
+			Balance:   [2]sdk.Uint{sdk.NewUint(0), sdk.NewUint(0)},
+			Finalized: false,
+		},
 	}
 }
 
 func (c *Channel) ID() (id ChannelID) {
-	return c.params.ID()
+	copy(id[:], c.hash())
+	return
 }
 
-func (p *ChannelParameters) ID() (id ChannelID) {
+func (p *ChannelParameters) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(p.members[0][:])
-	hasher.Write(p.members[1][:])
-	hasher.Write(p.nonce[:])
+	hasher.Write(p.Members[0][:])
+	hasher.Write(p.Members[1][:])
+	hasher.Write(p.Nonce[:])
+	hasher.Write(sdk.Uint64ToBigEndian(p.ChallengeDuration))
+	return hasher.Sum(nil)
+}
 
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, p.challengeDuration)
+func (s *ChannelState) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(sdk.Uint64ToBigEndian(s.Version))
+	buf := make([]byte, 16)
+	s.Balance[0].BigInt().FillBytes(buf)
+	hasher.Write(buf)
+	buf = make([]byte, 16)
+	s.Balance[1].BigInt().FillBytes(buf)
 	hasher.Write(buf)
 
-	copy(id[:], hasher.Sum(nil))
-	return
+	b := func() byte {
+		if s.Finalized {
+			return 1
+		} else {
+			return 0
+		}
+	}()
+	hasher.Write([]byte{b})
+
+	return hasher.Sum(nil)
+}
+
+func (c *Channel) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(c.params.hash())
+	hasher.Write(c.state.hash())
+	return hasher.Sum(nil)
 }

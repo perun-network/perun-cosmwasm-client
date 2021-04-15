@@ -55,22 +55,31 @@ func main() {
 	client2 := createChannelClient(Client2Name, kr, contractAddress)
 	log.Printf("Client2 created with address=%s\n", client2.cosmosClient.ctx.FromAddress)
 
-	amount := sdk.NewInt64Coin(DENOMINATION, 100000)
+	asset := sdk.NewInt64Coin(DENOMINATION, 100000)
 	receiver := client1.cosmosClient.acc.GetAddress()
-	operator.transfer(receiver, amount)
-	log.Printf("Transfered %v from %s to %s\n", amount, operator.ctx.GetFromAddress(), receiver)
+	operator.transfer(receiver, asset)
+	log.Printf("Transfered %v from %s to %s\n", asset, operator.ctx.GetFromAddress(), receiver)
 
-	amount = sdk.NewInt64Coin(DENOMINATION, 100000)
+	asset = sdk.NewInt64Coin(DENOMINATION, 100000)
 	receiver = client2.cosmosClient.acc.GetAddress()
-	operator.transfer(receiver, amount)
-	log.Printf("Transfered %v from %s to %s\n", amount, operator.ctx.GetFromAddress(), receiver)
+	operator.transfer(receiver, asset)
+	log.Printf("Transfered %v from %s to %s\n", asset, operator.ctx.GetFromAddress(), receiver)
 
 	ch := createChannel(client1, client2)
 	log.Printf("Channel created with id=%x\n", ch.ID())
 
-	client1.deposit(ch, sdk.NewInt(10))
-	log.Printf("Channel funds deposited by %s\n", client1.cosmosClient.ctx.GetFromName())
+	amount := sdk.NewUint(10)
+	client1.deposit(ch, amount)
+	ch.state.Balance[0] = amount
+	log.Printf("Funds deposited at channel %x by %s\n", ch.ID(), client1.cosmosClient.ctx.GetFromName())
 
-	client2.deposit(ch, sdk.NewInt(10))
-	log.Printf("Channel funds deposited by %s\n", client2.cosmosClient.ctx.GetFromName())
+	amount = sdk.NewUint(10)
+	client2.deposit(ch, amount)
+	ch.state.Balance[1] = amount
+	log.Printf("Funds deposited at channel %x by %s\n", ch.ID(), client2.cosmosClient.ctx.GetFromName())
+
+	sig1 := client1.sign(ch)
+	sig2 := client2.sign(ch)
+	client1.register(ch, sig1, sig2)
+	log.Printf("Channel %x registered by %s\n", ch.ID(), client2.cosmosClient.ctx.GetFromName())
 }
