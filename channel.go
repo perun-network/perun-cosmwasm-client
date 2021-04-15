@@ -37,20 +37,20 @@ type (
 )
 
 type ChannelClient struct {
-	cosmosClient    *CosmosClient
+	*CosmosClient
 	contractAddress ContractAddress
 }
 
 func createChannelClient(name string, kr keyring.Keyring, contractAddress ContractAddress) *ChannelClient {
 	cosmosClient := createCosmosClient(name, kr)
 	return &ChannelClient{
-		cosmosClient:    cosmosClient,
+		CosmosClient:    cosmosClient,
 		contractAddress: contractAddress,
 	}
 }
 
 func (c *ChannelClient) ChannelMemberAddress() (addr ChannelMemberAddress) {
-	pub := c.cosmosClient.acc.GetPubKey().Bytes()
+	pub := c.acc.GetPubKey().Bytes()
 	pubDecompressed, err := crypto.DecompressPubkey(pub)
 	if err != nil {
 		panic(err)
@@ -61,12 +61,12 @@ func (c *ChannelClient) ChannelMemberAddress() (addr ChannelMemberAddress) {
 	return
 }
 
-func createChannel(c1, c2 *ChannelClient) *Channel {
+func createChannel(c1, c2 *ChannelClient, challengeDuration uint64) *Channel {
 	return &Channel{
 		params: ChannelParameters{
 			Members:           [2][20]byte{c1.ChannelMemberAddress(), c2.ChannelMemberAddress()},
 			Nonce:             ChannelNonce{},
-			ChallengeDuration: 60,
+			ChallengeDuration: challengeDuration,
 		},
 		state: ChannelState{
 			Version:   0,
@@ -77,7 +77,7 @@ func createChannel(c1, c2 *ChannelClient) *Channel {
 }
 
 func (c *Channel) ID() (id ChannelID) {
-	copy(id[:], c.hash())
+	copy(id[:], c.params.hash())
 	return
 }
 

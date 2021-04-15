@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
+	"log"
 	"os"
 
 	"github.com/CosmWasm/wasmd/app"
@@ -11,7 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/cosmos/cosmos-sdk/x/bank/types"
+	bank "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
 	"github.com/ethereum/go-ethereum/crypto"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -38,7 +40,7 @@ func createCosmosClient(name string, kr keyring.Keyring) *CosmosClient {
 }
 
 func (c *CosmosClient) transfer(addr sdk.AccAddress, coin sdk.Coin) {
-	msg := types.NewMsgSend(c.ctx.GetFromAddress(), addr, sdk.NewCoins(coin))
+	msg := bank.NewMsgSend(c.ctx.GetFromAddress(), addr, sdk.NewCoins(coin))
 	err := msg.ValidateBasic()
 	if err != nil {
 		panic(err)
@@ -119,7 +121,7 @@ type Signature struct {
 
 func (c *ChannelClient) privateKey() *ecdsa.PrivateKey {
 	pwd := ""
-	a, err := c.cosmosClient.ctx.Keyring.ExportPrivKeyArmorByAddress(c.cosmosClient.acc.GetAddress(), pwd)
+	a, err := c.ctx.Keyring.ExportPrivKeyArmorByAddress(c.acc.GetAddress(), pwd)
 	if err != nil {
 		panic(err)
 	}
@@ -137,18 +139,36 @@ func (c *ChannelClient) privateKey() *ecdsa.PrivateKey {
 	return privKey
 }
 
-func (c *ChannelClient) sign(ch *Channel) Signature {
+func (c *ChannelClient) signChannel(ch *Channel) Signature {
+	return c.signHash(ch.hash())
+}
+
+func (c *ChannelClient) signHash(h []byte) Signature {
 	k := c.privateKey()
-	h := ch.hash()
+
 	sig, err := crypto.Sign(h, k)
 	if err != nil {
 		panic(err)
 	}
-
 	_sig := Signature{}
 	copy(_sig.R[:], sig[:32])
 	copy(_sig.S[:], sig[32:])
 	_sig.V = sig[64]
 
 	return _sig
+}
+
+func (c *CosmosClient) Balance() *sdk.Coin {
+	queryClient := bank.NewQueryClient(c.ctx)
+	params := bank.NewQueryBalanceRequest(c.acc.GetAddress(), DENOMINATION)
+	r, err := queryClient.Balance(context.Background(), params)
+	if err != nil {
+		panic(err)
+	}
+	return r.Balance
+}
+
+func (c *CosmosClient) PrintBalance() {
+	bal := c.Balance()
+	log.Printf("Balance of client %v: %s\n", c.acc.GetName(), bal)
 }

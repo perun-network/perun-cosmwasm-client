@@ -19,7 +19,7 @@ type DepositMsg struct {
 
 func (c *ChannelClient) deposit(ch *Channel, a TokenAmount) {
 	msg, err := genDepositMsg(
-		c.cosmosClient.ctx.FromAddress,
+		c.ctx.FromAddress,
 		c.contractAddress,
 		ch.ID(),
 		c.ChannelMemberAddress(),
@@ -29,15 +29,12 @@ func (c *ChannelClient) deposit(ch *Channel, a TokenAmount) {
 		panic(err)
 	}
 
-	fmt.Println(string(msg.Msg))
 	validateMessageJSON(msg.Msg)
 
-	r, err := transact(c.cosmosClient.ctx, &msg)
+	_, err = transact(c.ctx, &msg)
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println(string(r.raw))
 }
 
 func validateMessageJSON(msg []byte) {
