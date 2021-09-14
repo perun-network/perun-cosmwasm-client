@@ -1,8 +1,8 @@
-# Perun CosmWasm Client
+# Perun CosmWasm Study: Client
 
 This repository contains a proof-of-concept implementation of a client for the Perun CosmWasm contracts.
 
-The repository uses the contracts from [perun-cosmwasm-contracts](https://github.com/perun-network/perun-cosmwasm-contracts).
+The repository uses the contracts from [perun-cosmwasm-study_contracts](https://github.com/perun-network/perun-cosmwasm-study_contracts).
 
 ## Organization
 
